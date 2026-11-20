@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import { Activity, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Clock3, Dumbbell, Info, Moon, Printer, Search, Sun, Target } from 'lucide-react';
+import { Activity, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Clock3, Download, Dumbbell, Info, Moon, Printer, Search, Sun, Target } from 'lucide-react';
 import { allExercises, programWeeks, dayForDate, weekStartKey, warmup, type Exercise, type TrainingDay, type TrainingDay as Day } from './program';
-import { exerciseMedia, exerciseDemoNotes, exerciseGifCredits } from './exercise-media';
+import { cacheAllExerciseMedia, exerciseMedia, exerciseDemoNotes, exerciseGifCredits } from './exercise-media';
 import { cueFor } from './catalog';
 import { attendanceDb, attendanceId, requestPersistentAttendanceStorage, type AttendanceRecord } from './attendance';
 
@@ -33,7 +33,7 @@ export default function App(){
  const isAttended=(dayId:string)=>attendance.some(row=>row.id===attendanceId(currentWeek,dayId));
  return <div className={`guide-shell view-${screen}`} data-theme={theme}>
   <header className="guide-header">
-   <a className="guide-brand" href="#today" onClick={event=>{event.preventDefault();setScreen('today');setSelectedDay(today)}} aria-label="SanaFit home"><span className="guide-brand-icon"><Activity size={20}/></span><span className="guide-brand-copy"><b>SANAFIT</b><small>HOME WORKOUT PLAN</small></span></a>
+   <a className="guide-brand" href="#today" onClick={event=>{event.preventDefault();setScreen('today');setSelectedDay(today)}} aria-label="SanaFit home"><span className="guide-brand-icon"><span className="brand-letter-s">S</span></span><span className="guide-brand-copy"><b>SANAFIT</b><small>HOME WORKOUT PLAN</small></span></a>
    <nav className="guide-nav" aria-label="Main navigation"><button className={screen==='today'?'guide-nav-item current':'guide-nav-item'} onClick={()=>setScreen('today')}><Target size={16}/> Workout</button><button className={screen==='week'?'guide-nav-item current':'guide-nav-item'} onClick={()=>setScreen('week')}><CalendarDays size={16}/> Weekly plan</button><button className={screen==='exercises'?'guide-nav-item current':'guide-nav-item'} onClick={()=>setScreen('exercises')}><Dumbbell size={16}/> Exercises</button><button className={screen==='progress'?'guide-nav-item current':'guide-nav-item'} onClick={()=>setScreen('progress')}><CheckCircle2 size={16}/> Progress</button></nav>
    <div className="guide-header-actions"><button className="guide-theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme==='dark'?'light':'dark'} mode`} title={`Switch to ${theme==='dark'?'light':'dark'} mode`}>{theme==='dark'?<Sun size={16}/>:<Moon size={16}/>}<span>{theme==='dark'?'Light mode':'Dark mode'}</span></button><button className="guide-print" onClick={()=>window.print()}><Printer size={16}/><span>Print plan</span></button></div>
   </header>
@@ -74,6 +74,13 @@ function categoryFor(exercise:Exercise):Exclude<ExerciseCategory,'All'>{
 function ExerciseLibrary(){
  const [category,setCategory]=useState<ExerciseCategory>('All');
  const [query,setQuery]=useState('');
+ const [offlineBusy,setOfflineBusy]=useState(false);
+ const [offlineProgress,setOfflineProgress]=useState({done:0,total:0});
+ const [offlineMessage,setOfflineMessage]=useState('');
+ const saveForOffline=async()=>{
+  setOfflineBusy(true);setOfflineMessage('');setOfflineProgress({done:0,total:0});
+  try{const result=await cacheAllExerciseMedia((done,total)=>setOfflineProgress({done,total}));setOfflineMessage(result.failed?`Saved ${result.saved} of ${result.total} demos. Connect to the internet and retry the remaining files.`:`All ${result.total} exercise demos are saved on this device. SanaFit can now open offline.`)}catch{setOfflineMessage('Offline saving is unavailable here. Open SanaFit over HTTPS and try again.')}finally{setOfflineBusy(false)}
+ };
  const catalog=useMemo(()=>{
   const seen=new Set<string>();
   return allExercises.filter(exercise=>{const key=exercise.name.toLowerCase();if(seen.has(key))return false;seen.add(key);return true});
@@ -82,6 +89,7 @@ function ExerciseLibrary(){
  return <>
   <section className="guide-intro"><div className="guide-overline">HOME MOVEMENT DIRECTORY</div><h1>Exercises in Sana’s plan</h1><p>Browse the movements in the weekly home program. Search by name or filter by category; each exercise includes equipment, sets, reps, rest, and form guidance. Exact demos appear where an accurate animation is available.</p></section>
   <p className="demo-attribution">Exercise demos: <a href={exerciseGifCredits.exerciseGym} target="_blank" rel="noreferrer">Exercise Gym GIFs DB</a> and the custom files supplied in the New Exersices folder.</p>
+  <section className="offline-pack"><div><div className="guide-overline">OFFLINE ACCESS</div><h2>Take SanaFit with you</h2><p>Save all exercise demos on this device. After the first online visit, the workout plan will open without an internet connection.</p></div><div className="offline-pack-action"><button className="offline-pack-button" onClick={()=>void saveForOffline()} disabled={offlineBusy}><Download size={16}/>{offlineBusy?`Saving ${offlineProgress.done}/${offlineProgress.total||'…'}`:'Save all demos offline'}</button>{offlineMessage&&<small className="offline-pack-status" role="status">{offlineMessage}</small>}</div></section>
   <div className="library-tools"><label className="exercise-search"><Search size={17}/><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search plan exercises" aria-label="Search plan exercises"/></label><span className="library-count">{filtered.length} of {catalog.length} exercises</span></div>
   <div className="library-categories" aria-label="Filter exercises by category">{exerciseCategories.map(item=><button key={item} className={category===item?'library-category active':'library-category'} onClick={()=>setCategory(item)} aria-pressed={category===item}>{item}</button>)}</div>
   {filtered.length?<div className="exercise-cards library-exercise-cards">{filtered.map((exercise,index)=><div className="library-entry" key={`${exercise.id}-${exercise.name}`}><div className="library-entry-label"><span>{categoryFor(exercise)}</span><span>IN YOUR PROGRAM</span></div><ExerciseCard exercise={exercise} index={index}/></div>)}</div>:<div className="library-empty">No plan exercises match that search.</div>}

@@ -29,6 +29,34 @@ export const exerciseMedia: Readonly<Record<string, string>> = {
   'ball-wall-squat': local('yoga-ball-wall-squat-hold.gif'),
 };
 
+export const offlineExerciseMediaCache = 'sanafit-exercise-media-v1';
+
+export async function cacheAllExerciseMedia(onProgress: (done: number, total: number) => void) {
+  if (!('caches' in window) || !('serviceWorker' in navigator)) throw new Error('Offline storage is unavailable in this browser.');
+  await navigator.serviceWorker.ready;
+  const urls = [...new Set(Object.values(exerciseMedia))];
+  const cache = await caches.open(offlineExerciseMediaCache);
+  let saved = 0;
+  let failed = 0;
+
+  for (let index = 0; index < urls.length; index += 1) {
+    const url = urls[index];
+    try {
+      if (!await cache.match(url)) {
+        const response = await fetch(new Request(url, { mode: 'no-cors', cache: 'reload' }));
+        if (!response.ok && response.type !== 'opaque') throw new Error('Could not cache media');
+        await cache.put(url, response);
+      }
+      saved += 1;
+    } catch {
+      failed += 1;
+    }
+    onProgress(index + 1, urls.length);
+  }
+
+  return { saved, failed, total: urls.length };
+}
+
 export const exerciseDemoNotes: Readonly<Record<string, string>> = {
   'goblet-chair-squat': 'Goblet squat demo; use the chair as your depth target.',
   'long-band-biceps-curl': 'Standing band curl shown with alternating arms.',
