@@ -25,7 +25,7 @@ export const exerciseMedia: Readonly<Record<string, string>> = {
   'single-leg-glute-bridge': gif('glutes/single-leg-bridge-with-outstretched-leg.gif'),
   'mini-band-standing-abduction': local('mini-band-standing-abduction.gif'),
   'dumbbell-biceps-curl': gif('biceps/dumbbell-standing-biceps-curl.gif'),
-  'bird-dog': 'https://media.giphy.com/media/MB6Wq1mxoXDluNbP5B/giphy.gif',
+  'bird-dog': local('bird-dog.gif'),
   'ball-wall-squat': local('yoga-ball-wall-squat-hold.gif'),
 };
 
@@ -37,5 +37,4 @@ export const exerciseDemoNotes: Readonly<Record<string, string>> = {
 
 export const exerciseGifCredits = {
   exerciseGym: 'https://github.com/JahelCuadrado/ExerciseGymGifsDB',
-  giphyBirdDog: 'https://giphy.com/gifs/bird-dog-bodyweight-exercises-MB6Wq1mxoXDluNbP5B',
 };
