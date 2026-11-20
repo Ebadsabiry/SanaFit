@@ -7,6 +7,10 @@ import { attendanceDb, attendanceId, requestPersistentAttendanceStorage, type At
 
 type Screen = 'today' | 'week' | 'exercises' | 'progress';
 type Theme = 'dark' | 'light';
+const screenFromHash = (hash:string):Screen => {
+ const screen=hash.replace(/^#/,'');
+ return screen==='week'||screen==='exercises'||screen==='progress'?screen:'today';
+};
 const dayKeys = ['sat','sun','mon','tue','wed','thu','fri'];
 const scheduledDays = ['sat','mon','wed'];
 const dose = (exercise:Exercise) => `${exercise.sets} × ${exercise.min === exercise.max ? exercise.min : `${exercise.min}–${exercise.max}`} ${exercise.unit === 'seconds' ? 'sec' : exercise.unit === 'steps' ? 'steps' : 'reps'}${exercise.unilateral ? (exercise.unit === 'steps' ? ' each direction' : ' each side') : ''}`;
@@ -15,7 +19,7 @@ const targetMuscles:Record<string,string[]>={sat:['Thighs','Glutes','Hamstrings'
 const storedTheme = ():Theme => localStorage.getItem('sanafit-theme')==='light'?'light':'dark';
 export default function App(){
  const today=useMemo(()=>dayForDate(new Date(),'Asia/Kabul'),[]);
- const [screen,setScreen]=useState<Screen>('today');
+ const [screen,setScreen]=useState<Screen>(()=>screenFromHash(window.location.hash));
  const currentWeek=useMemo(()=>weekStartKey(new Date(),'Asia/Kabul'),[]);
  const [theme,setTheme]=useState<Theme>(storedTheme);
  const [selectedDay,setSelectedDay]=useState(today);
@@ -25,6 +29,8 @@ export default function App(){
  const selected=activeWeek.days.find(day=>day.id===selectedDay)??activeWeek.days[0];
  const isToday=selected.id===today;
  useEffect(()=>{attendanceDb.entries.toArray().then(setAttendance).catch(()=>setAttendanceError('Attendance storage is unavailable on this browser.'))},[]);
+ useEffect(()=>{const syncScreen=()=>setScreen(screenFromHash(window.location.hash));window.addEventListener('hashchange',syncScreen);if(!window.location.hash)window.history.replaceState(null,'','#today');return()=>window.removeEventListener('hashchange',syncScreen)},[]);
+ const navigate=(next:Screen)=>{if(screenFromHash(window.location.hash)!==next)window.location.hash=next;setScreen(next)};
  const toggleTheme=()=>setTheme(current=>{const next=current==='dark'?'light':'dark';localStorage.setItem('sanafit-theme',next);return next});
  const toggleAttendance=async(dayId:string)=>{
   const id=attendanceId(currentWeek,dayId);
@@ -33,8 +39,8 @@ export default function App(){
  const isAttended=(dayId:string)=>attendance.some(row=>row.id===attendanceId(currentWeek,dayId));
  return <div className={`guide-shell view-${screen}`} data-theme={theme}>
   <header className="guide-header">
-   <a className="guide-brand" href="#today" onClick={event=>{event.preventDefault();setScreen('today');setSelectedDay(today)}} aria-label="SanaFit home"><span className="guide-brand-icon"><span className="brand-letter-s">S</span></span><span className="guide-brand-copy"><b>SANAFIT</b><small>HOME WORKOUT PLAN</small></span></a>
-   <nav className="guide-nav" aria-label="Main navigation"><button className={screen==='today'?'guide-nav-item current':'guide-nav-item'} onClick={()=>setScreen('today')}><Target size={16}/> Workout</button><button className={screen==='week'?'guide-nav-item current':'guide-nav-item'} onClick={()=>setScreen('week')}><CalendarDays size={16}/> Weekly plan</button><button className={screen==='exercises'?'guide-nav-item current':'guide-nav-item'} onClick={()=>setScreen('exercises')}><Dumbbell size={16}/> Exercises</button><button className={screen==='progress'?'guide-nav-item current':'guide-nav-item'} onClick={()=>setScreen('progress')}><CheckCircle2 size={16}/> Progress</button></nav>
+   <a className="guide-brand" href="#today" onClick={event=>{event.preventDefault();navigate('today');setSelectedDay(today)}} aria-label="SanaFit home"><span className="guide-brand-icon"><span className="brand-letter-s">S</span></span><span className="guide-brand-copy"><b>SANAFIT</b><small>HOME WORKOUT PLAN</small></span></a>
+   <nav className="guide-nav" aria-label="Main navigation"><button className={screen==='today'?'guide-nav-item current':'guide-nav-item'} onClick={()=>navigate('today')}><Target size={16}/> Workout</button><button className={screen==='week'?'guide-nav-item current':'guide-nav-item'} onClick={()=>navigate('week')}><CalendarDays size={16}/> Weekly plan</button><button className={screen==='exercises'?'guide-nav-item current':'guide-nav-item'} onClick={()=>navigate('exercises')}><Dumbbell size={16}/> Exercises</button><button className={screen==='progress'?'guide-nav-item current':'guide-nav-item'} onClick={()=>navigate('progress')}><CheckCircle2 size={16}/> Progress</button></nav>
    <div className="guide-header-actions"><button className="guide-theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme==='dark'?'light':'dark'} mode`} title={`Switch to ${theme==='dark'?'light':'dark'} mode`}>{theme==='dark'?<Sun size={16}/>:<Moon size={16}/>}<span>{theme==='dark'?'Light mode':'Dark mode'}</span></button><button className="guide-print" onClick={()=>window.print()}><Printer size={16}/><span>Print plan</span></button></div>
   </header>
   <main className="guide-main">
@@ -47,7 +53,7 @@ export default function App(){
    {screen==='week'&&<>
     <section className="guide-intro week-intro"><div><div className="guide-overline">SANA’S HOME WORKOUT SCHEDULE</div><h1>{activeWeek.title}</h1><p>{activeWeek.approach}</p></div><button className="guide-print large-print" onClick={()=>window.print()}><Printer size={16}/> Print plan</button></section>
     <h1 className="week-print-title">SanaFit · Weekly Home Plan</h1>
-    <div className="week-plan-list">{activeWeek.days.map(day=><WeekDay key={day.id} day={day} attended={isAttended(day.id)} onToggle={()=>void toggleAttendance(day.id)} onOpen={()=>{setSelectedDay(day.id);setScreen('today')}}/>)}</div>
+    <div className="week-plan-list">{activeWeek.days.map(day=><WeekDay key={day.id} day={day} attended={isAttended(day.id)} onToggle={()=>void toggleAttendance(day.id)} onOpen={()=>{setSelectedDay(day.id);navigate('today')}}/>)}</div>
    </>}
    {screen==='exercises'&&<ExerciseLibrary/>}
    {screen==='progress'&&<ProgressPage attendance={attendance} currentWeek={currentWeek}/ >}
